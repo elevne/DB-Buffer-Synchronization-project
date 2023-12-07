@@ -1,101 +1,75 @@
 package simpledb.tx.concurrency;
 
 import simpledb.file.BlockId;
-import simpledb.tx.concurrency.LockAbortException;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 class LockTable {
-   private static final long MAX_TIME = 10000;
-
    private Map<BlockId, List<Integer>> locks = new HashMap<>();
-   private ThreadLocal<Integer> currentTxId = new ThreadLocal<>();
+   private Map<Integer, Long> timestamps = new HashMap<>();
+   private long MAX_TIME = 10000;
 
-   private Map<Integer, Integer> blkIdTxId = new HashMap<>();
-
-   public synchronized void sLock(BlockId blk) {
+   public synchronized void sLock(BlockId blk, int txid) {
       try {
-         int txId = generateTransactionId();
-         //currentTxId.set(txId);
-         blkIdTxId.put(blk.number(), txId);
          long timestamp = System.currentTimeMillis();
+         timestamps.put(txid, timestamp);
          while (hasXlock(blk) && !waitingTooLong(timestamp)) {
-            checkAbort(txId);
-            wait(MAX_TIME);
+            checkAbort(txid, blk, timestamp);
+            wait(100);
          }
          if (hasXlock(blk))
-            throw new LockAbortException();
+         {
+            System.out.println(blk.toString() + " failed to get S lock");
+            throw new LockAbortException();}
          List<Integer> txids = locks.computeIfAbsent(blk, k -> new ArrayList<>());
-         //txids.add(getCurrentTxId());
-         txids.add(txId);
+         txids.add(txid);
       } catch (InterruptedException e) {
          throw new LockAbortException();
-      } finally {
-         currentTxId.remove();
       }
    }
 
-   public synchronized void xLock(BlockId blk) {
+   public synchronized void xLock(BlockId blk, int txid) {
       try {
-         int txId = generateTransactionId();
-         //currentTxId.set(txId);
-         blkIdTxId.put(blk.number(), txId);
          long timestamp = System.currentTimeMillis();
+         timestamps.put(txid, timestamp);
          while (hasOtherSLocks(blk) && !waitingTooLong(timestamp)) {
-            checkAbort(txId);
-            wait(MAX_TIME);
+            checkAbort(txid, blk, timestamp);
+            wait(100);
          }
-         if (hasOtherSLocks(blk))
+         if (hasOtherSLocks(blk)){
+            System.out.println(blk.toString() + " failed to get X lock");
             throw new LockAbortException();
-         //locks.put(blk, Collections.singletonList(-getCurrentTxId()));
-         locks.put(blk, Collections.singletonList(-txId));
+         }
+         locks.put(blk, Collections.singletonList(-txid));
       } catch (InterruptedException e) {
          throw new LockAbortException();
-      } finally {
-         currentTxId.remove();
       }
    }
 
-   public synchronized void unlock(BlockId blk) {
-      try {
-         //int currentTxIdValue = getCurrentTxId();
-         int currentTxIdValue = blkIdTxId.get(blk.number());
-         List<Integer> txids = locks.get(blk);
-         if (txids != null) {
-            txids.remove(Integer.valueOf(currentTxIdValue));
-            if (txids.isEmpty()) {
-               locks.remove(blk);
-               notifyAll();
-            }
-         }
-      } catch (IllegalStateException e) {
-         e.printStackTrace();
+   public synchronized void unlock(BlockId blk, int txid) {
+      List<Integer> txids = locks.get(blk);
+      if (txids != null) {
+         txids.remove(Integer.valueOf(txid));
+         if (!txids.isEmpty())
+            locks.remove(blk);
       }
+      notifyAll();
    }
 
-   private void checkAbort(int currentTxid) {
-      //int currentTxid = getCurrentTxId();
-      for (List<Integer> txids : locks.values()) {
+   private void checkAbort(int txid, BlockId blk, long requestingTimestamp) {
+      List<Integer> txids = locks.get(blk);
+      if (txids != null) {
          for (int heldTxid : txids) {
-            if (heldTxid < 0 && heldTxid < currentTxid) {
-               //System.out.println("Transaction " + getCurrentTxId() + " aborts");
+            Long heldTimestamp = timestamps.get(heldTxid);
+            if (heldTimestamp != null && heldTimestamp < requestingTimestamp) {
                throw new LockAbortException();
             }
          }
       }
-   }
-
-   private int getCurrentTxId() {
-      Integer txId = currentTxId.get();
-      if (txId == null) {
-         throw new IllegalStateException("Transaction ID not set for the current thread.");
-      }
-      return txId;
-   }
-
-   private int generateTransactionId() {
-      // You may implement your logic to generate unique transaction IDs
-      return new Random().nextInt(1000) + 1; // For simplicity, using a random number here
    }
 
    private boolean hasXlock(BlockId blk) {

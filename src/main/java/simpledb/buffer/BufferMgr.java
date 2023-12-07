@@ -10,10 +10,10 @@ import java.util.List;
 import java.util.Map;
 
 public class BufferMgr {
-   private List<Buffer> bufferList; // List of unpinned buffers (LRU)
-   private Map<BlockId, Buffer> bufferMap; // Map of allocated buffers, keyed on block
+   private List<Buffer> bufferList;
+   private Map<BlockId, Buffer> bufferMap;
 
-   private static final long MAX_TIME = 10000; // 10 seconds
+   private static final long MAX_TIME = 10000;
 
    public BufferMgr(FileMgr fm, LogMgr lm, int numbuffs) {
       bufferList = new LinkedList<>();
@@ -35,7 +35,7 @@ public class BufferMgr {
    public synchronized void unpin(Buffer buff) {
       buff.unpin();
       if (!buff.isPinned()) {
-         bufferList.add(buff); // Add to the end of the list (LRU)
+         bufferList.add(buff);
          notifyAll();
       }
    }
@@ -67,10 +67,10 @@ public class BufferMgr {
          if (buff == null)
             return null;
          buff.assignToBlock(blk);
-         bufferMap.put(blk, buff); // Add to the map
+         bufferMap.put(blk, buff);
       }
       if (!buff.isPinned())
-         bufferList.remove(buff); // Remove from the list (LRU)
+         bufferList.remove(buff);
       buff.pin();
       return buff;
    }
@@ -79,14 +79,9 @@ public class BufferMgr {
       if (bufferList.isEmpty())
          return null;
       else
-         return bufferList.remove(0); // Remove from the head of the list (LRU)
+         return bufferList.remove(0);
    }
 
-   /**
-    * Prints the current status of the buffer manager.
-    * Displays the ID, block, and pinned status of each buffer in the allocated map,
-    * plus the IDs of each buffer in the unpinned list in LRU order.
-    */
    public synchronized void printStatus() {
       System.out.println("Allocated Buffers:");
       for (Buffer buff : bufferMap.values()) {

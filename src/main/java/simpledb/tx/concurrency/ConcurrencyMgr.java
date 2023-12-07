@@ -5,20 +5,24 @@ import simpledb.file.BlockId;
 
 /**
  * The concurrency manager for the transaction.
- * Each transaction has its own concurrency manager. 
- * The concurrency manager keeps track of which locks the 
+ * Each transaction has its own concurrency manager.
+ * The concurrency manager keeps track of which locks the
  * transaction currently has, and interacts with the
- * global lock table as needed. 
+ * global lock table as needed.
  * @author Edward Sciore
  */
 public class ConcurrencyMgr {
 
    /**
-    * The global lock table. This variable is static because 
+    * The global lock table. This variable is static because
     * all transactions share the same table.
     */
    private static LockTable locktbl = new LockTable();
    private Map<BlockId,String> locks  = new HashMap<BlockId,String>();
+   private int txId;
+   public ConcurrencyMgr(int txId) {
+      this.txId = txId;
+   }
 
    /**
     * Obtain an SLock on the block, if necessary.
@@ -28,7 +32,7 @@ public class ConcurrencyMgr {
     */
    public void sLock(BlockId blk) {
       if (locks.get(blk) == null) {
-         locktbl.sLock(blk);
+         locktbl.sLock(blk, this.txId);
          locks.put(blk, "S");
       }
    }
@@ -43,7 +47,7 @@ public class ConcurrencyMgr {
    public void xLock(BlockId blk) {
       if (!hasXLock(blk)) {
          sLock(blk);
-         locktbl.xLock(blk);
+         locktbl.xLock(blk, this.txId);
          locks.put(blk, "X");
       }
    }
@@ -53,8 +57,8 @@ public class ConcurrencyMgr {
     * unlock each one.
     */
    public void release() {
-      for (BlockId blk : locks.keySet()) 
-         locktbl.unlock(blk);
+      for (BlockId blk : locks.keySet())
+         locktbl.unlock(blk, this.txId);
       locks.clear();
    }
 
