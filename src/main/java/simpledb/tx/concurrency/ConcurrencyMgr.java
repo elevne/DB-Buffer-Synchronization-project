@@ -18,7 +18,7 @@ public class ConcurrencyMgr {
     * all transactions share the same table.
     */
    private static LockTable locktbl = new LockTable();
-   private Map<BlockId,String> locks  = new HashMap<BlockId,String>();
+   private Map<BlockId,String> locks  = new HashMap<>();
    private int txId;
    public ConcurrencyMgr(int txId) {
       this.txId = txId;

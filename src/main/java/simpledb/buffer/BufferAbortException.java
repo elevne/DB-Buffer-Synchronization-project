@@ -5,5 +5,4 @@ package simpledb.buffer;
  * needs to abort because a buffer request could not be satisfied.
  * @author Edward Sciore
  */
-@SuppressWarnings("serial")
 public class BufferAbortException extends RuntimeException {}
